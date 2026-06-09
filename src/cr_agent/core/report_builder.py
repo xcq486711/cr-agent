@@ -89,12 +89,12 @@ class ReviewReport:
             lines.append("| Severity | Category | File | Line | Issue |")
             lines.append("|---|---|---|---|---|")
             for f in self.findings:
-                severity_emoji = {
-                    "critical": "🔴", "warning": "🟡",
-                    "suggestion": "🔵", "nitpick": "⚪",
-                }.get(f.severity, "⚪")
+                severity_tag = {
+                    "critical": "[!]", "warning": "[~]",
+                    "suggestion": "[*]", "nitpick": "[ ]",
+                }.get(f.severity, "[ ]")
                 lines.append(
-                    f"| {severity_emoji} {f.severity} | {f.category} | "
+                    f"| {severity_tag} {f.severity} | {f.category} | "
                     f"`{f.file}` | {f.line_start}-{f.line_end} | {f.title} |"
                 )
 
