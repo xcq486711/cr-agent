@@ -1,0 +1,40 @@
+diff --git a/src/auth/login.py b/src/auth/login.py
+index 1234567..abcdefg 100644
+--- a/src/auth/login.py
++++ b/src/auth/login.py
+@@ -15,6 +15,12 @@ from flask import request, session
+ def authenticate(username, password):
+     """Authenticate user against database."""
+     conn = get_db_connection()
+-    cursor = conn.cursor()
+-    cursor.execute(f"SELECT * FROM users WHERE username='{username}' AND password='{password}'")
+-    user = cursor.fetchone()
++    # Validate input
++    if not username or not password:
++        return None
++
++    cursor = conn.cursor()
++    query = f"SELECT * FROM users WHERE username='{username}' AND password='{password}'"
++    cursor.execute(query)
++    user = cursor.fetchone()
+     return user
+diff --git a/src/utils/config.py b/src/utils/config.py
+new file mode 100644
+--- /dev/null
++++ b/src/utils/config.py
+@@ -0,0 +1,8 @@
++"""Application configuration."""
++
++import os
++
++DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///app.db")
++SECRET_KEY = "hardcoded-secret-key-12345"
++DEBUG = True
++API_TOKEN = "sk-live-abc123def456"
+diff --git a/package-lock.json b/package-lock.json
+index aaaaaaa..bbbbbbb 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,3 +1,3 @@
+-  "version": "1.0.0",
++  "version": "1.0.1",
