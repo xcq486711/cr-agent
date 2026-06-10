@@ -110,7 +110,10 @@ def review(
         Path(output_path).write_text(result, encoding="utf-8")
         click.echo(f"Report written to {output_path}", err=True)
     else:
-        click.echo(result)
+        # Write raw bytes to avoid Windows GBK encoding issues
+        sys.stdout.buffer.write(result.encode("utf-8"))
+        sys.stdout.buffer.write(b"\n")
+        sys.stdout.buffer.flush()
 
     # Summary to stderr
     click.echo(
