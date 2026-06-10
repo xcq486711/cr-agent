@@ -30,8 +30,23 @@ class Settings(BaseSettings):
     max_concurrent_agents: int = Field(
         default=10, validation_alias="CR_AGENT_MAX_CONCURRENT_AGENTS"
     )
-    context_token_budget: int = Field(
-        default=58_000,
+    context_token_budget: int = Field(default=58_000)
+
+    # Database
+    database_url: str = Field(
+        default="postgresql+asyncpg://cr_agent:cr_agent@localhost:5432/cr_agent",
+        validation_alias="DATABASE_URL",
+    )
+
+    # Redis
+    redis_url: str = Field(
+        default="redis://localhost:6379",
+        validation_alias="REDIS_URL",
+    )
+
+    # Auth
+    api_key_header: str = Field(
+        default="X-API-Key",
     )
 
     model_config = {
