@@ -59,10 +59,10 @@ class TestExtractAndParseJson:
         assert result.findings[0].severity == "warning"
         assert result.findings[0].confidence == 0.85
 
-    def test_invalid_json_raises(self):
+    def test_invalid_json_falls_back_to_empty(self):
         raw = "This is not JSON at all"
-        with pytest.raises((json.JSONDecodeError, ValueError)):
-            self.client._extract_and_parse_json(raw, ReviewOutput)
+        result = self.client._extract_and_parse_json(raw, ReviewOutput)
+        assert result.findings == []
 
     def test_json_missing_required_field(self):
         # findings[0] missing 'file' field

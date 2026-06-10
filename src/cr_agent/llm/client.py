@@ -395,15 +395,15 @@ class LLMClient:
         return messages
 
     def _extract_and_parse_json(self, raw_text: str, schema: type[BaseModel]) -> BaseModel:
-        """Extract JSON from LLM output (handles ```json wrapping) and validate."""
+        """Extract JSON from LLM output with multi-level fallback."""
         text = raw_text.strip()
 
-        # Try to extract from markdown code block
+        # Step 1: Extract from markdown code block
         json_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
         if json_match:
             text = json_match.group(1).strip()
 
-        # Try to find JSON object boundaries
+        # Step 2: Find JSON boundaries
         if not text.startswith("{"):
             start = text.find("{")
             if start != -1:
@@ -414,5 +414,116 @@ class LLMClient:
             if end != -1:
                 text = text[: end + 1]
 
-        data = json.loads(text)
-        return schema.model_validate(data)
+        # Step 3: Try direct parsing
+        try:
+            data = json.loads(text)
+            return schema.model_validate(data)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        # Step 4: Try sanitizing — fix common LLM JSON mistakes
+        sanitized = self._sanitize_json(text)
+        try:
+            data = json.loads(sanitized)
+            return schema.model_validate(data)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        # Step 5: Regex extraction — pull out key fields and build model manually
+        return self._regex_extract_findings(text, schema)
+
+    def _sanitize_json(self, text: str) -> str:
+        """Fix common JSON issues from LLM output."""
+        # Remove BOM
+        if text.startswith("﻿"):
+            text = text[1:]
+
+        # Fix unescaped newlines within string values
+        # (JSON strings cannot contain literal newlines)
+        result = []
+        in_string = False
+        escape_next = False
+        for ch in text:
+            if escape_next:
+                escape_next = False
+                result.append(ch)
+                continue
+            if ch == "\\":
+                escape_next = True
+                result.append(ch)
+                continue
+            if ch == '"':
+                in_string = not in_string
+                result.append(ch)
+                continue
+            if in_string and ch in ("\n", "\r", "\t"):
+                result.append({"\\n": "\\\\n", "\\r": "\\\\r", "\\t": "\\\\t"}.get(repr(ch)[1:-1], " "))
+                continue
+            result.append(ch)
+        return "".join(result)
+
+    def _regex_extract_findings(self, text: str, schema: type[BaseModel]) -> BaseModel:
+        """Last resort: extract findings fields via regex."""
+        # Look for "findings" array
+        findings_match = re.search(r'"findings"\s*:\s*\[(.*)\]', text, re.DOTALL)
+        if not findings_match:
+            # Return empty result rather than failing
+            return schema(findings=[], summary="Parse failed — returning empty result")
+
+        findings_text = findings_match.group(1)
+        # Extract individual finding objects via brace matching
+        findings = []
+        depth = 0
+        start = -1
+        for i, ch in enumerate(findings_text):
+            if ch == "{":
+                if depth == 0:
+                    start = i
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0 and start != -1:
+                    obj_text = findings_text[start : i + 1]
+                    finding = self._extract_single_finding(obj_text)
+                    if finding:
+                        findings.append(finding)
+                    start = -1
+
+        # Extract summary
+        summary_match = re.search(r'"summary"\s*:\s*"([^"]*)"', text)
+        summary = summary_match.group(1) if summary_match else ""
+
+        return schema(findings=findings, summary=summary)
+
+    def _extract_single_finding(self, obj_text: str) -> dict | None:
+        """Extract a single finding dict from JSON-like text using regex."""
+        try:
+            return json.loads(obj_text)
+        except json.JSONDecodeError:
+            pass
+
+        # Manual field extraction
+        result = {}
+        field_patterns = {
+            "file": r'"file"\s*:\s*"([^"]*)"',
+            "severity": r'"severity"\s*:\s*"([^"]*)"',
+            "category": r'"category"\s*:\s*"([^"]*)"',
+            "title": r'"title"\s*:\s*"([^"]*)"',
+            "description": r'"description"\s*:\s*"([^"]*)"',
+            "suggestion": r'"suggestion"\s*:\s*"([^"]*)"',
+            "line_start": r'"line_start"\s*:\s*(\d+)',
+            "line_end": r'"line_end"\s*:\s*(\d+)',
+            "confidence": r'"confidence"\s*:\s*([\d.]+)',
+        }
+        for key, pattern in field_patterns.items():
+            match = re.search(pattern, obj_text, re.DOTALL)
+            if match:
+                val = match.group(1)
+                if key in ("line_start", "line_end"):
+                    result[key] = int(val)
+                elif key == "confidence":
+                    result[key] = float(val)
+                else:
+                    result[key] = val
+
+        return result if "file" in result and "title" in result else None
