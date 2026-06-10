@@ -32,9 +32,9 @@ class Settings(BaseSettings):
     )
     context_token_budget: int = Field(default=58_000)
 
-    # Database
+    # Database (SQLite for dev, PostgreSQL for production)
     database_url: str = Field(
-        default="postgresql+asyncpg://cr_agent:cr_agent@localhost:5432/cr_agent",
+        default="sqlite+aiosqlite:///cr_agent.db",
         validation_alias="DATABASE_URL",
     )
 

@@ -12,12 +12,20 @@ export async function getReviewStatus(reviewId) {
   return data
 }
 
-export async function getRecentReviews(page = 1, size = 20) {
+export async function listReviews(page = 1, size = 20) {
   const { data } = await api.get('/reviews', { params: { page, size } })
   return data
 }
 
-export async function checkHealth() {
-  const { data } = await axios.get('/health')
-  return data
+export async function submitReviewAndPoll(diffContent, onProgress) {
+  const { review_id } = await submitReview(diffContent)
+  let attempts = 0
+  while (attempts < 60) {
+    const status = await getReviewStatus(review_id)
+    if (onProgress) onProgress(status)
+    if (status.status === 'completed' || status.status === 'failed') return status
+    await new Promise(r => setTimeout(r, 2000))
+    attempts++
+  }
+  throw new Error('Review timed out')
 }

@@ -13,9 +13,8 @@ from cr_agent.core import ReviewOrchestrator
 from cr_agent.llm import LLMClient
 from cr_agent.agents import LogicAgent, PerformanceAgent, SecurityAgent, StyleAgent
 from cr_agent.storage.database import get_db
-from cr_agent.storage.models import Finding, Review
+from cr_agent.storage.models import Finding, Review, Tenant
 from cr_agent.api.deps import get_current_tenant
-from cr_agent.storage.models import Tenant
 
 import structlog
 
@@ -122,6 +121,53 @@ async def submit_review(
         review_id=str(review_id),
         status_url=f"/api/v1/reviews/{review_id}",
     )
+
+
+@router.get("")
+async def list_reviews(
+    page: int = 1,
+    size: int = 20,
+    db: AsyncSession = Depends(get_db),
+):
+    """List recent reviews with pagination."""
+    from sqlalchemy import func as sa_func
+
+    offset = (page - 1) * size
+    result = await db.execute(
+        select(Review).order_by(Review.created_at.desc()).offset(offset).limit(size)
+    )
+    reviews = result.scalars().all()
+
+    # Count findings per review in one query (avoids lazy loading issue)
+    review_ids = [r.id for r in reviews]
+    counts = {}
+    if review_ids:
+        count_result = await db.execute(
+            select(Finding.review_id, sa_func.count(Finding.id))
+            .where(Finding.review_id.in_(review_ids))
+            .group_by(Finding.review_id)
+        )
+        counts = {row[0]: row[1] for row in count_result}
+
+    return {
+        "reviews": [
+            {
+                "review_id": str(r.id),
+                "repo_url": r.repo_url,
+                "pr_number": r.pr_number,
+                "status": r.status,
+                "findings_count": counts.get(r.id, 0),
+                "tokens_in": r.tokens_in,
+                "tokens_out": r.tokens_out,
+                "cost_usd": r.cost_usd,
+                "duration_ms": (r.completed_at - r.started_at).total_seconds() * 1000 if r.completed_at and r.started_at else 0,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in reviews
+        ],
+        "page": page,
+        "size": size,
+    }
 
 
 @router.get("/{review_id}", response_model=ReviewStatus)
