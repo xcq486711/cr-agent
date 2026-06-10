@@ -1,0 +1,10 @@
+{
+  "title": "SQL Injection via f-string query construction",
+  "language": "python",
+  "diff": "diff --git a/auth.py b/auth.py\n--- a/auth.py\n+++ b/auth.py\n@@ -10,6 +10,12 @@ def authenticate(username, password):\n     conn = get_db()\n-    cursor = conn.cursor()\n-    cursor.execute(\"SELECT * FROM users WHERE name=? AND pass=?\", (username, password))\n-    user = cursor.fetchone()\n+    query = f\"SELECT * FROM users WHERE name='{username}' AND pass='{password}'\"\n+    cursor = conn.cursor()\n+    cursor.execute(query)\n+    user = cursor.fetchone()\n     return user",
+  "ground_truth": [
+    {"file": "auth.py", "line": 13, "severity": "critical", "category": "security",
+     "description": "SQL injection via f-string. User input directly interpolated into SQL query."}
+  ],
+  "false_positive_patterns": []
+}

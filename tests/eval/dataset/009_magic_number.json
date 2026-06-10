@@ -1,0 +1,10 @@
+{
+  "title": "Magic numbers without named constants",
+  "language": "python",
+  "diff": "diff --git a/validator.py b/validator.py\n--- a/validator.py\n+++ b/validator.py\n@@ -1,3 +1,5 @@\n def validate_age(age):\n-    return MIN_AGE <= age <= MAX_AGE\n+    if age < 0 or age > 150:\n+        return False\n+    if len(str(age)) > 3:\n+        return False\n+    return True",
+  "ground_truth": [
+    {"file": "validator.py", "line": 4, "severity": "suggestion", "category": "style",
+     "description": "Magic numbers 0, 150, 3 used without named constants"}
+  ],
+  "false_positive_patterns": []
+}

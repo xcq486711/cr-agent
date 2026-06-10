@@ -1,0 +1,16 @@
+{
+  "title": "Mixed: SQL injection + hardcoded key + N+1 + magic number",
+  "language": "java",
+  "diff": "diff --git a/UserController.java b/UserController.java\n--- a/UserController.java\n+++ b/UserController.java\n@@ -15,6 +15,12 @@ public class UserController {\n     @GetMapping(\"/search\")\n-    public List<User> search(@RequestParam String name) {\n-        return userService.searchByName(name);\n+    public List<User> search(@RequestParam String q) {\n+        String sql = \"SELECT * FROM users WHERE name LIKE '%\" + q + \"%'\";\n+        jdbcTemplate.query(sql, new UserRowMapper());\n+        String apiKey = \"sk-live-xyz789\";\n+        for (User user : users) {\n+            List<Order> orders = orderRepo.findByUserId(user.getId());\n+        }\n+        if (users.size() > 100) { /* paginate */ }\n     }",
+  "ground_truth": [
+    {"file": "UserController.java", "line": 19, "severity": "critical", "category": "security",
+     "description": "SQL injection: string concatenation in LIKE query"},
+    {"file": "UserController.java", "line": 21, "severity": "critical", "category": "security",
+     "description": "Hardcoded API key in source code"},
+    {"file": "UserController.java", "line": 22, "severity": "warning", "category": "performance",
+     "description": "N+1 query: per-user order fetch inside loop"},
+    {"file": "UserController.java", "line": 25, "severity": "suggestion", "category": "style",
+     "description": "Magic number 100 used without constant"}
+  ],
+  "false_positive_patterns": []
+}

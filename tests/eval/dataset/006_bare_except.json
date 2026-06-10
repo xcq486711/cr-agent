@@ -1,0 +1,10 @@
+{
+  "title": "Bare except clause swallowing all errors",
+  "language": "python",
+  "diff": "diff --git a/payment.py b/payment.py\n--- a/payment.py\n+++ b/payment.py\n@@ -5,6 +5,9 @@ def process_payment(order_id, amount):\n     try:\n         gateway.charge(order_id, amount)\n         db.mark_paid(order_id)\n-    except PaymentError:\n-        db.mark_failed(order_id)\n-        raise\n+    except:\n+        pass\n     return True",
+  "ground_truth": [
+    {"file": "payment.py", "line": 8, "severity": "critical", "category": "logic",
+     "description": "Bare except:pass swallows all exceptions including KeyboardInterrupt. Payment failure silently ignored, order marked as paid."}
+  ],
+  "false_positive_patterns": []
+}

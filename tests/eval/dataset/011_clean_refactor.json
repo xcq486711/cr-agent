@@ -1,0 +1,9 @@
+{
+  "title": "Clean rename refactor — should have 0 findings",
+  "language": "python",
+  "diff": "diff --git a/models.py b/models.py\n--- a/models.py\n+++ b/models.py\n@@ -5,7 +5,7 @@ class Customer(Base):\n     __tablename__ = \"customers\"\n     id = Column(Integer, primary_key=True)\n-    name = Column(String(100))\n-    email_addr = Column(String(200))\n+    full_name = Column(String(100))\n+    email = Column(String(200))\n     created_at = Column(DateTime, default=datetime.utcnow)",
+  "ground_truth": [],
+  "false_positive_patterns": [
+    "Any finding in this file is a false positive — this is a simple rename refactor"
+  ]
+}

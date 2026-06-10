@@ -1,0 +1,10 @@
+{
+  "title": "Database connection leak in loop",
+  "language": "python",
+  "diff": "diff --git a/batch_worker.py b/batch_worker.py\n--- a/batch_worker.py\n+++ b/batch_worker.py\n@@ -3,6 +3,8 @@ def process_batch(items):\n     for item in items:\n-        with get_db() as db:\n-            db.execute(transform(item))\n+        db = get_db()\n+        db.execute(transform(item))",
+  "ground_truth": [
+    {"file": "batch_worker.py", "line": 6, "severity": "warning", "category": "performance",
+     "description": "Resource leak: DB connection not closed in loop, removed context manager"}
+  ],
+  "false_positive_patterns": []
+}

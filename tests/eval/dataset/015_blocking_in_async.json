@@ -1,0 +1,12 @@
+{
+  "title": "Synchronous blocking call in async function",
+  "language": "python",
+  "diff": "diff --git a/api.py b/api.py\n--- a/api.py\n+++ b/api.py\n@@ -6,8 +6,8 @@ async def get_dashboard():\n-    users = await user_repo.count_async()\n-    orders = await order_repo.summary_async()\n+    users = user_repo.count()\n+    orders = order_repo.summary()\n     stats = calculate_stats(users, orders)\n-    return await render_async(\"dashboard\", stats)\n+    return render(\"dashboard\", stats)",
+  "ground_truth": [
+    {"file": "api.py", "line": 9, "severity": "warning", "category": "performance",
+     "description": "Synchronous blocking calls in async handler — replaced async DB queries with sync versions"},
+    {"file": "api.py", "line": 10, "severity": "warning", "category": "performance",
+     "description": "Synchronous render call in async function"}
+  ],
+  "false_positive_patterns": []
+}

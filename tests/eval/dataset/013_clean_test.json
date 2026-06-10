@@ -1,0 +1,9 @@
+{
+  "title": "Test file update only — should have 0 findings",
+  "language": "python",
+  "diff": "diff --git a/test_auth.py b/test_auth.py\n--- a/test_auth.py\n+++ b/test_auth.py\n@@ -5,6 +5,8 @@ def test_login_success():\n     response = client.post(\"/login\", json={\"user\": \"admin\", \"pass\": \"test123\"})\n     assert response.status_code == 200\n+def test_login_failure_wrong_password():\n+    response = client.post(\"/login\", json={\"user\": \"admin\", \"pass\": \"wrong\"})\n+    assert response.status_code == 401",
+  "ground_truth": [],
+  "false_positive_patterns": [
+    "Test file: hard exclusion rule applies"
+  ]
+}

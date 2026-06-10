@@ -1,0 +1,10 @@
+{
+  "title": "Path traversal in file read",
+  "language": "python",
+  "diff": "diff --git a/file_server.py b/file_server.py\n--- a/file_server.py\n+++ b/file_server.py\n@@ -3,6 +3,8 @@ def read_file(filename):\n-    safe_path = os.path.join(BASE_DIR, os.path.basename(filename))\n+    # User can do ../../etc/passwd\n+    safe_path = os.path.join(BASE_DIR, filename)\n     with open(safe_path) as f:\n         return f.read()",
+  "ground_truth": [
+    {"file": "file_server.py", "line": 6, "severity": "critical", "category": "security",
+     "description": "Path traversal: filename not sanitized, attacker can read arbitrary files"}
+  ],
+  "false_positive_patterns": []
+}

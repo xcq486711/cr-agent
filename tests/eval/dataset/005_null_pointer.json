@@ -1,0 +1,10 @@
+{
+  "title": "Null pointer / None check missing",
+  "language": "python",
+  "diff": "diff --git a/user_service.py b/user_service.py\n--- a/user_service.py\n+++ b/user_service.py\n@@ -8,6 +8,8 @@ def get_user_profile(user_id):\n     user = db.query(User).filter_by(id=user_id).first()\n-    if user is None:\n-        return None\n-    return {\"name\": user.full_name, \"email\": user.email}\n+    # Removed None check — will crash if user not found\n+    return {\"name\": user.full_name, \"email\": user.email}",
+  "ground_truth": [
+    {"file": "user_service.py", "line": 11, "severity": "warning", "category": "logic",
+     "description": "Missing null check: user may be None, causing AttributeError"}
+  ],
+  "false_positive_patterns": []
+}

@@ -1,0 +1,10 @@
+{
+  "title": "N+1 query in loop",
+  "language": "python",
+  "diff": "diff --git a/report.py b/report.py\n--- a/report.py\n+++ b/report.py\n@@ -4,6 +4,8 @@ def generate_order_report(customer_ids):\n-    orders = db.query(Order).filter(Order.customer_id.in_(customer_ids)).all()\n+    orders = []\n+    for cid in customer_ids:\n+        orders.extend(db.query(Order).filter_by(customer_id=cid).all())\n     return format_report(orders)",
+  "ground_truth": [
+    {"file": "report.py", "line": 7, "severity": "warning", "category": "performance",
+     "description": "N+1 query: replaced efficient IN query with per-customer loop, hitting DB N times"}
+  ],
+  "false_positive_patterns": []
+}

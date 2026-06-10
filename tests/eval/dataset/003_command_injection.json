@@ -1,0 +1,10 @@
+{
+  "title": "Command injection via user input in subprocess call",
+  "language": "python",
+  "diff": "diff --git a/utils.py b/utils.py\n--- a/utils.py\n+++ b/utils.py\n@@ -5,6 +5,10 @@ def ping_host(host):\n-    result = subprocess.run([\"ping\", \"-c\", \"1\", host], capture_output=True, text=True)\n+    # User can inject commands:  example.com; rm -rf /\n+    result = subprocess.run(f\"ping -c 1 {host}\", shell=True, capture_output=True, text=True)\n     return result.stdout",
+  "ground_truth": [
+    {"file": "utils.py", "line": 8, "severity": "critical", "category": "security",
+     "description": "Command injection via shell=True with unsanitized user input"}
+  ],
+  "false_positive_patterns": []
+}

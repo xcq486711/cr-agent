@@ -1,0 +1,9 @@
+{
+  "title": "Documentation update only — should have 0 findings",
+  "language": "python",
+  "diff": "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1,3 +1,5 @@\n # MyProject\n \n-A simple project.\n+A Python web application for order management.\n+\n+## Installation\n+```bash\n+pip install myproject\n+```",
+  "ground_truth": [],
+  "false_positive_patterns": [
+    "Any finding in this diff is a false positive — docs only"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "title": "New function is too long",
+  "language": "python",
+  "diff": "diff --git a/handler.py b/handler.py\n--- a/handler.py\n+++ b/handler.py\n@@ -10,3 +10,53 @@ def handle_request(req):\n+def process_order(order):\n+    # Validate\n+    if not order.id:\n+        return None\n+    if not order.items:\n+        return None\n+    total = 0\n+    for item in order.items:\n+        total += item.price\n+    # Apply discount\n+    if order.coupon:\n+        total *= 0.9\n+    # Calculate tax\n+    tax = total * 0.08\n+    total += tax\n+    # Create invoice\n+    invoice = Invoice()\n+    invoice.order_id = order.id\n+    invoice.total = total\n+    # Save\n+    db.save(invoice)\n+    # Send email\n+    email_service.send(order.user.email, \"Order confirmed\")\n+    # Log\n+    logger.info(f\"Order {order.id} processed\")\n+    # Update inventory\n+    for item in order.items:\n+        inventory = db.query(Inventory).filter_by(sku=item.sku).first()\n+        inventory.quantity -= 1\n+        db.save(inventory)\n+    # Update stats\n+    stats_service.record_sale(order)\n+    # Schedule delivery\n+    delivery_service.schedule(order)\n+    # Generate receipt\n+    receipt = PDFGenerator.create_receipt(invoice)\n+    storage.upload(receipt)\n+    # Cleanup\n+    cart_service.clear(order.user_id)\n+    return invoice",
+  "ground_truth": [
+    {"file": "handler.py", "line": 13, "severity": "suggestion", "category": "style",
+     "description": "New function process_order is ~50 lines. Should be split into smaller functions (validate, calculate, notify)."}
+  ],
+  "false_positive_patterns": []
+}
