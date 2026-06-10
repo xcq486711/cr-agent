@@ -45,9 +45,12 @@ class Settings(BaseSettings):
     )
 
     # Auth
-    api_key_header: str = Field(
-        default="X-API-Key",
-    )
+    api_key_header: str = Field(default="X-API-Key")
+
+    # GitHub App
+    github_app_id: str = Field(default="", validation_alias="GITHUB_APP_ID")
+    github_app_private_key: str = Field(default="", validation_alias="GITHUB_APP_PRIVATE_KEY")
+    github_webhook_secret: str = Field(default="", validation_alias="GITHUB_WEBHOOK_SECRET")
 
     model_config = {
         "env_file": ".env",

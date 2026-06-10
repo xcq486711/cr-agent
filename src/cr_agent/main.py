@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from cr_agent.api.routes import health, review
+from cr_agent.api.routes import health, review, webhook
 from cr_agent.storage.database import engine
 from cr_agent.storage.models import Base
 
@@ -37,3 +37,4 @@ app.add_middleware(
 # Routes
 app.include_router(health.router)
 app.include_router(review.router)
+app.include_router(webhook.router)
