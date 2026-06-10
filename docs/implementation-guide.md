@@ -7,8 +7,8 @@
 ## 当前状态
 
 - [x] 架构设计文档完成 (`docs/code-review-agent-design.md`)
-- [ ] Phase 1: 核心可用
-- [ ] Phase 2: 生产化
+- [x] Phase 1: 核心可用 (16 commits, 42 tests)
+- [x] Phase 2: 生产化 (4 Agents + Tool Calling + FastAPI + GitHub App)
 - [ ] Phase 3: 可观测 + 评估 + 学习
 - [ ] Phase 4: 打磨
 
@@ -26,12 +26,12 @@ cr-agent review --diff tests/fixtures/sample.patch
 ### 实施步骤（按顺序）
 
 #### Step 1.1: 项目初始化
-- [ ] 创建新项目目录 `cr-agent/`（独立于当前 smart-cs-agent 学习项目）
-- [ ] `pyproject.toml`：uv 管理，依赖列表见下方
-- [ ] 目录结构：按设计文档 §3 创建所有 `__init__.py`
-- [ ] `src/cr_agent/config.py`：Pydantic Settings（API key、模型名、超时等）
-- [ ] `.env.example`：DeepSeek API key 占位
-- [ ] 验证：`uv run python -c "from cr_agent import config; print(config.settings)"`
+- [x] 创建新项目目录 `cr-agent/`（独立于当前 smart-cs-agent 学习项目）
+- [x] `pyproject.toml`：uv 管理，依赖列表见下方
+- [x] 目录结构：按设计文档 §3 创建所有 `__init__.py`
+- [x] `src/cr_agent/config.py`：Pydantic Settings（API key、模型名、超时等）
+- [x] `.env.example`：DeepSeek API key 占位
+- [x] 验证：`uv run python -c "from cr_agent import config; print(config.settings)"`
 
 **核心依赖**：
 ```
@@ -46,15 +46,15 @@ pytest-asyncio     # 异步测试
 ```
 
 #### Step 1.2: LLM Client
-- [ ] `src/cr_agent/llm/client.py`：LLMClient 类
+- [x] `src/cr_agent/llm/client.py`：LLMClient 类
   - `chat(messages) -> str`
   - `chat_structured(messages, schema) -> BaseModel`
   - retry 循环（指数退避 + jitter）
   - DeepSeek API 调用（httpx async）
-- [ ] `src/cr_agent/llm/schema.py`：ReviewFinding + ReviewOutput Pydantic models
-- [ ] `src/cr_agent/llm/cost_tracker.py`：基础版（内存计数，不存 DB）
-- [ ] 单元测试：mock LLM 响应，验证 retry 和 structured output 解析
-- [ ] 集成测试：真实调一次 DeepSeek，验证连通性
+- [x] `src/cr_agent/llm/schema.py`：ReviewFinding + ReviewOutput Pydantic models
+- [x] `src/cr_agent/llm/cost_tracker.py`：基础版（内存计数，不存 DB）
+- [x] 单元测试：mock LLM 响应，验证 retry 和 structured output 解析
+- [x] 集成测试：真实调一次 DeepSeek，验证连通性
 
 **关键实现细节**：
 - DeepSeek 的 chat API 兼容 OpenAI 格式，base_url = `https://api.deepseek.com`
@@ -62,13 +62,13 @@ pytest-asyncio     # 异步测试
 - 注意 DeepSeek 可能返回 ```json ... ``` 包裹的输出，需要 regex 提取
 
 #### Step 1.3: Diff Parser
-- [ ] `src/cr_agent/core/diff_parser.py`：解析 unified diff 格式
+- [x] `src/cr_agent/core/diff_parser.py`：解析 unified diff 格式
   - 输入：.patch 文件内容（字符串）
   - 输出：`list[FileDiff]`，每个包含 path, hunks, added_lines, removed_lines
-- [ ] `src/cr_agent/core/file_filter.py`：过滤规则
+- [x] `src/cr_agent/core/file_filter.py`：过滤规则
   - 默认排除：`*.lock`, `*.sum`, `vendor/`, `node_modules/`, `*.min.js`
-- [ ] 单元测试：准备 3-5 个 sample .patch 文件作为 fixtures
-- [ ] 验证：`uv run pytest tests/unit/test_diff_parser.py`
+- [x] 单元测试：准备 3-5 个 sample .patch 文件作为 fixtures
+- [x] 验证：`uv run pytest tests/unit/test_diff_parser.py`
 
 **关键实现细节**：
 - Python 标准库无现成 unified diff parser（`difflib` 是生成 diff 的，不是解析的）
@@ -76,12 +76,12 @@ pytest-asyncio     # 异步测试
 - 或用 `unidiff` 第三方库（轻量，400 star）
 
 #### Step 1.4: Security Agent（第一个 Agent）
-- [ ] `src/cr_agent/agents/base.py`：BaseReviewAgent 抽象基类
+- [x] `src/cr_agent/agents/base.py`：BaseReviewAgent 抽象基类
   - metadata: AgentMetadata
   - `review(context) -> ReviewOutput`
-- [ ] `src/cr_agent/agents/security.py`：SecurityAgent 实现
-- [ ] `src/cr_agent/agents/prompts/security.j2`：完整的 system prompt
-- [ ] 验证：手动传一段有 SQL 注入的 diff，看能否检出
+- [x] `src/cr_agent/agents/security.py`：SecurityAgent 实现
+- [x] `src/cr_agent/agents/prompts/security.j2`：完整的 system prompt
+- [x] 验证：手动传一段有 SQL 注入的 diff，看能否检出
 
 **Prompt 要点（security.j2 核心结构）**：
 ```
@@ -93,21 +93,21 @@ SYSTEM: 你是高级安全工程师，审查以下代码变更...
 ```
 
 #### Step 1.5: Orchestrator（串行版）
-- [ ] `src/cr_agent/core/orchestrator.py`：ReviewOrchestrator
+- [x] `src/cr_agent/core/orchestrator.py`：ReviewOrchestrator
   - `run(diff_content: str) -> ReviewReport`
   - 串行调用：parse → filter → build_context → agent.review → report
   - 暂不并行，先跑通流程
-- [ ] `src/cr_agent/core/context_builder.py`：简化版
+- [x] `src/cr_agent/core/context_builder.py`：简化版
   - MVP：直接用 diff hunk + 上下 10 行作为 context（不拉完整文件）
-- [ ] 端到端测试：一个 .patch → 完整 JSON 报告
+- [x] 端到端测试：一个 .patch → 完整 JSON 报告
 
 #### Step 1.6: CLI 入口
-- [ ] `src/cr_agent/cli.py`：Click CLI
+- [x] `src/cr_agent/cli.py`：Click CLI
   - `cr-agent review --diff <path>` — 从文件读 patch
   - `cr-agent review --pr <github_url>` — Phase 2 再做，先留占位
   - 输出：JSON 打印到 stdout / 写文件
-- [ ] `pyproject.toml` 注册 entry point：`[project.scripts] cr-agent = "cr_agent.cli:main"`
-- [ ] 验证：`uv run cr-agent review --diff tests/fixtures/sample.patch`
+- [x] `pyproject.toml` 注册 entry point：`[project.scripts] cr-agent = "cr_agent.cli:main"`
+- [x] 验证：`uv run cr-agent review --diff tests/fixtures/sample.patch`
 
 ---
 
@@ -120,33 +120,33 @@ SYSTEM: 你是高级安全工程师，审查以下代码变更...
 ### 实施步骤
 
 #### Step 2.1: 补全 Agents
-- [ ] Logic Agent + prompt
-- [ ] Performance Agent + prompt
-- [ ] Style Agent + prompt
-- [ ] 并行执行改造（asyncio.gather + semaphore）
+- [x] Logic Agent + prompt
+- [x] Performance Agent + prompt
+- [x] Style Agent + prompt
+- [x] 并行执行改造（asyncio.gather + semaphore）
 
 #### Step 2.2: FastAPI + 异步队列
-- [ ] `src/cr_agent/main.py`：FastAPI app
-- [ ] `src/cr_agent/api/routes/`：webhook, review, report, health
-- [ ] `src/cr_agent/worker/`：arq worker 入口
-- [ ] Redis 队列：幂等 + 优先级
-- [ ] Review 状态机：queued → running → completed/failed
+- [x] `src/cr_agent/main.py`：FastAPI app
+- [x] `src/cr_agent/api/routes/`：webhook, review, report, health
+- [x] `src/cr_agent/worker/`：arq worker 入口
+- [x] Redis 队列：幂等 + 优先级
+- [x] Review 状态机：queued → running → completed/failed
 
 #### Step 2.3: 数据库
-- [ ] PostgreSQL + SQLAlchemy async
-- [ ] Alembic 迁移
-- [ ] tenants / reviews / findings 三张表
+- [x] PostgreSQL + SQLAlchemy async
+- [x] Alembic 迁移
+- [x] tenants / reviews / findings 三张表
 
 #### Step 2.4: GitHub App 集成
-- [ ] 注册 GitHub App
-- [ ] Webhook 接收 + 签名验证
-- [ ] 拉 PR diff（GitHub API）
-- [ ] 回写 PR Review（inline comments）
+- [x] 注册 GitHub App
+- [x] Webhook 接收 + 签名验证
+- [x] 拉 PR diff（GitHub API）
+- [x] 回写 PR Review（inline comments）
 
 #### Step 2.5: Docker
-- [ ] Dockerfile（multi-stage build）
-- [ ] docker-compose.yml：app + worker + postgres + redis
-- [ ] 验证：`docker compose up` → 发起审查 → 看到结果
+- [x] Dockerfile（multi-stage build）
+- [x] docker-compose.yml：app + worker + postgres + redis
+- [x] 验证：`docker compose up` → 发起审查 → 看到结果
 
 ---
 
@@ -197,5 +197,7 @@ SYSTEM: 你是高级安全工程师，审查以下代码变更...
 ## 每次对话的开场指令
 
 ```
-请打开 docs/implementation-guide.md 查看当前进度，继续实现下一个未完成的 Step。
+请打开 D:\cr-agent\docs\implementation-guide.md 查看当前进度，继续实现下一个未完成的 Step。
 ```
+
+仓库地址: https://github.com/xcq486711/cr-agent
