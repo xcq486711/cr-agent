@@ -36,12 +36,14 @@ class ReviewOrchestrator:
         cost_tracker: CostTracker | None = None,
         confidence_threshold: float = 0.7,
         max_concurrent: int = 10,
+        enable_verification: bool = True,
     ):
         self.agents = agents
         self.filter_config = filter_config or FilterConfig()
         self.cost_tracker = cost_tracker or CostTracker()
         self.confidence_threshold = confidence_threshold
         self.max_concurrent = max_concurrent
+        self.enable_verification = enable_verification
 
     async def run(self, diff_text: str) -> ReviewReport:
         """Execute the full review pipeline."""
@@ -105,8 +107,25 @@ class ReviewOrchestrator:
         results = list(agent_results.values())
         failed_list = sorted(failed_agents)
 
-        # Step 6: Merge, dedup, filter, sort
+        # Step 6: Merge, dedup, verify, filter, sort
         all_findings = self._merge_and_dedup(results)
+
+        # Verification phase: re-check severity >= warning with a skeptic prompt
+        if self.enable_verification:
+            to_verify = [f for f in all_findings if f.severity in ("critical", "warning")]
+            skip_verify = [f for f in all_findings if f.severity not in ("critical", "warning")]
+        else:
+            to_verify = []
+            skip_verify = all_findings
+        if to_verify:
+            logger.info("orchestrator.verify.start", count=len(to_verify))
+            verified = await self._verify_findings(to_verify)
+            # Use verification confidence for verified findings
+            for f in verified:
+                if hasattr(f, "_verified_confidence"):
+                    f.confidence = f._verified_confidence
+            all_findings = verified + skip_verify
+
         all_findings = [f for f in all_findings if f.confidence >= self.confidence_threshold]
         severity_order = {"critical": 0, "warning": 1, "suggestion": 2, "nitpick": 3}
         all_findings.sort(key=lambda f: (severity_order.get(f.severity, 99), -f.confidence))
@@ -126,6 +145,59 @@ class ReviewOrchestrator:
         total_output = sum(a.llm.cost_tracker.summary()["total_output_tokens"] for a in self.agents)
         total_cost = sum(a.llm.cost_tracker.summary()["total_cost_usd"] for a in self.agents)
         return {"total_input_tokens": total_input, "total_output_tokens": total_output, "total_cost_usd": total_cost}
+
+    async def _verify_findings(self, findings: list[ReviewFinding]) -> list[ReviewFinding]:
+        """Phase 2 verification: adversarial check of each finding with a skeptic LLM."""
+        from cr_agent.llm import LLMClient, VerificationResult
+
+        verifier = LLMClient()
+        verified: list[ReviewFinding] = []
+
+        # Verify in parallel with a concurrency limit
+        semaphore = asyncio.Semaphore(5)
+
+        async def verify_one(finding: ReviewFinding) -> ReviewFinding:
+            async with semaphore:
+                prompt = (
+                    f"你是一名代码审查 skeptic。请验证以下发现问题是否为真正的代码缺陷。\n\n"
+                    f"**发现**: {finding.title}\n"
+                    f"**文件**: {finding.file}:{finding.line_start}-{finding.line_end}\n"
+                    f"**类别**: {finding.category} | **原始置信度**: {finding.confidence:.0%}\n"
+                    f"**描述**: {finding.description}\n\n"
+                    f"## 判断标准\n"
+                    f"- 这真的是一个 bug 或安全问题吗？\n"
+                    f"- 是否有具体的可利用路径？\n"
+                    f"- 是否属于以下误报情况？\n"
+                    f"  1. 测试代码中的问题\n"
+                    f"  2. 理论性的、无实际攻击路径的\n"
+                    f"  3. 框架已有保护的\n"
+                    f"  4. 仅代码风格偏好\n"
+                    f"  5. 配置文件中的合理硬编码值\n\n"
+                    f"请输出 JSON：{{\"is_valid\": true/false, \"confidence\": 0.0-1.0, \"reason\": \"...\"}}"
+                )
+                try:
+                    result = await verifier.chat_structured(
+                        [{"role": "user", "content": prompt}],
+                        schema=VerificationResult,
+                        temperature=0.0,
+                        agent_type="verifier",
+                    )
+                    finding._verified_confidence = result.confidence
+                    logger.info(
+                        "verify_result",
+                        title=finding.title[:50],
+                        original_confidence=finding.confidence,
+                        verified_confidence=result.confidence,
+                        is_valid=result.is_valid,
+                    )
+                except Exception as e:
+                    logger.warning("verify_failed", title=finding.title[:50], error=str(e))
+                    finding._verified_confidence = finding.confidence  # Keep original on failure
+                return finding
+
+        tasks = [verify_one(f) for f in findings]
+        verified = await asyncio.gather(*tasks)
+        return list(verified)
 
     def _merge_and_dedup(self, results: list[ReviewOutput]) -> list[ReviewFinding]:
         all_findings: list[ReviewFinding] = []

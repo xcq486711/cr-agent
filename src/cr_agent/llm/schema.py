@@ -17,6 +17,14 @@ class ReviewFinding(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence score 0.0-1.0")
 
 
+class VerificationResult(BaseModel):
+    """Output from the verification phase — a second LLM judges if a finding is real."""
+
+    is_valid: bool = Field(description="Whether this is a real issue")
+    confidence: float = Field(ge=0.0, le=1.0, description="Verifier's confidence (0.0-1.0)")
+    reason: str = Field(default="", description="Brief reasoning for the verdict")
+
+
 class ReviewOutput(BaseModel):
     """Complete output from a single review agent."""
 

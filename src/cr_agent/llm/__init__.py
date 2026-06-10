@@ -9,7 +9,7 @@ from .client import (
     StructuredOutputError,
 )
 from .cost_tracker import BudgetExceededError, CostTracker, TokenUsage
-from .schema import ReviewFinding, ReviewOutput
+from .schema import ReviewFinding, ReviewOutput, VerificationResult
 from .tools import (
     Tool,
     ToolRegistry,
@@ -32,6 +32,7 @@ __all__ = [
     "ReviewOutput",
     "StructuredOutputError",
     "TokenUsage",
+    "VerificationResult",
     "Tool",
     "ToolRegistry",
     "ToolResult",
