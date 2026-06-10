@@ -198,6 +198,108 @@ class LLMClient:
             f"Last error: {last_error}"
         )
 
+    async def chat_with_tools(
+        self,
+        messages: list[dict],
+        tools: list[dict],
+        tool_registry,  # ToolRegistry
+        model: str | None = None,
+        temperature: float | None = None,
+        agent_type: str = "unknown",
+        max_tool_rounds: int = 5,
+    ) -> str:
+        """
+        ReAct loop: send messages + tools, execute tool calls, repeat.
+
+        Returns the final text response after all tool calls are resolved.
+        Max `max_tool_rounds` rounds to prevent infinite loops.
+        """
+        model = model or self.model
+        temperature = temperature if temperature is not None else settings.temperature
+
+        for round_num in range(max_tool_rounds):
+            body = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "tools": tools,
+                "tool_choice": "auto",
+            }
+
+            response_data = await self._request_with_retry(body)
+
+            # Track cost
+            usage = response_data.get("usage", {})
+            token_usage = TokenUsage(
+                input_tokens=usage.get("prompt_tokens", 0),
+                output_tokens=usage.get("completion_tokens", 0),
+            )
+            self.cost_tracker.record(model, agent_type, token_usage)
+
+            choice = response_data.get("choices", [{}])[0]
+            message = choice.get("message", {})
+
+            # If finish_reason is stop and no tool calls → done
+            tool_calls = message.get("tool_calls", [])
+            if not tool_calls or choice.get("finish_reason") == "stop":
+                return message.get("content", "")
+
+            # Append assistant message with tool calls
+            messages.append({
+                "role": "assistant",
+                "content": message.get("content") or "",
+                "tool_calls": [
+                    {
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tc["function"]["name"],
+                            "arguments": tc["function"]["arguments"],
+                        },
+                    }
+                    for tc in tool_calls
+                ],
+            })
+
+            # Execute each tool call and append results
+            for tc in tool_calls:
+                func_name = tc["function"]["name"]
+                try:
+                    func_args = json.loads(tc["function"]["arguments"])
+                except (json.JSONDecodeError, KeyError):
+                    func_args = {}
+
+                tool = tool_registry.get(func_name)
+                if tool is None:
+                    result = ToolResult(success=False, content="", error=f"Unknown tool: {func_name}")
+                else:
+                    try:
+                        result = await tool.handler(func_args)
+                    except Exception as e:
+                        result = ToolResult(success=False, content="", error=str(e))
+
+                result_content = result.content if result.success else f"Error: {result.error}"
+                if result.truncated:
+                    result_content += "\n(content truncated)"
+
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": result_content,
+                })
+
+        # Exhausted rounds — return what we have
+        logger.warning("chat_with_tools_max_rounds", max_rounds=max_tool_rounds)
+        # Ask LLM for final answer based on all accumulated context
+        body = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+        }
+        response_data = await self._request_with_retry(body)
+        choice = response_data.get("choices", [{}])[0]
+        return choice.get("message", {}).get("content", "")
+
     async def _request_with_retry(self, body: dict) -> dict:
         """Core retry loop — exponential backoff + jitter, 529 counting."""
         max_retries = settings.max_retries

@@ -14,6 +14,8 @@ import structlog
 
 from cr_agent import __version__
 from cr_agent.agents import LogicAgent, PerformanceAgent, SecurityAgent, StyleAgent
+from cr_agent.agents.tool_agent import ToolUsingAgent
+from cr_agent.llm import create_default_tools
 from cr_agent.core import ReviewOrchestrator
 from cr_agent.llm import LLMClient
 
@@ -60,6 +62,13 @@ def main():
     help="Confidence threshold override (0.0-1.0).",
 )
 @click.option(
+    "--workspace",
+    "-w",
+    type=click.Path(exists=True, file_okay=False),
+    default=None,
+    help="Project root directory. When set, agents can read files and search the codebase for context.",
+)
+@click.option(
     "--quiet",
     "-q",
     is_flag=True,
@@ -70,6 +79,7 @@ def review(
     output_format: str,
     output_path: str | None,
     threshold: float | None,
+    workspace: str | None,
     quiet: bool,
 ):
     """
@@ -78,7 +88,7 @@ def review(
     \b
     Examples:
       cr-agent review -d changes.patch
-      cr-agent review -d changes.patch -f markdown -o report.md
+      cr-agent review -d changes.patch -w . -f markdown -o report.md
     """
     if not quiet:
         _configure_logging()
@@ -90,13 +100,20 @@ def review(
 
     click.echo(f"Reviewing {diff_path}...", err=True)
 
-    # Wire up all 4 agents (each with its own LLM client)
-    agents = [
-        SecurityAgent(llm=LLMClient()),
-        LogicAgent(llm=LLMClient()),
-        PerformanceAgent(llm=LLMClient()),
-        StyleAgent(llm=LLMClient()),
-    ]
+    # Wire up agents — tool-using mode if workspace is provided
+    if workspace:
+        tool_registry = create_default_tools(workspace)
+        agents = [
+            ToolUsingAgent(SecurityAgent(llm=LLMClient()), tool_registry=tool_registry),
+        ]
+        click.echo(f"Tool-using mode with workspace: {workspace}", err=True)
+    else:
+        agents = [
+            SecurityAgent(llm=LLMClient()),
+            LogicAgent(llm=LLMClient()),
+            PerformanceAgent(llm=LLMClient()),
+            StyleAgent(llm=LLMClient()),
+        ]
     orchestrator = ReviewOrchestrator(
         agents=agents,
         confidence_threshold=threshold or 0.7,
