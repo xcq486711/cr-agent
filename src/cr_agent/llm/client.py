@@ -272,10 +272,15 @@ class LLMClient:
                 tool = tool_registry.get(func_name)
                 if tool is None:
                     result = ToolResult(success=False, content="", error=f"Unknown tool: {func_name}")
+                    logger.warning("tool_call_unknown", tool=func_name)
                 else:
+                    logger.info("tool_call", tool=func_name, args=str(func_args)[:100])
                     try:
                         result = await tool.handler(func_args)
+                        logger.info("tool_result", tool=func_name, success=result.success,
+                                    length=len(result.content[:200]))
                     except Exception as e:
+                        logger.error("tool_error", tool=func_name, error=str(e))
                         result = ToolResult(success=False, content="", error=str(e))
 
                 result_content = result.content if result.success else f"Error: {result.error}"
