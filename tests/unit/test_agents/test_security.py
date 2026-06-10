@@ -18,16 +18,16 @@ class TestSecurityAgentMetadata:
     def test_system_prompt_contains_key_sections(self):
         agent = SecurityAgent(llm=LLMClient(api_key="fake"))
         prompt = agent.system_prompt()
-        # Must contain security categories
-        assert "SQL injection" in prompt
-        assert "Command injection" in prompt
-        assert "Hardcoded" in prompt
+        # Must contain security categories (Chinese)
+        assert "SQL 注入" in prompt
+        assert "命令注入" in prompt
+        assert "硬编码" in prompt
         # Must contain exclusion rules
-        assert "Do NOT report" in prompt
-        assert "test files" in prompt.lower()
+        assert "不要报告" in prompt
+        assert "测试文件" in prompt
         # Must contain severity guidelines
         assert "critical" in prompt
-        assert "confidence" in prompt.lower()
+        assert "置信度" in prompt
 
     def test_user_prompt_includes_diff(self):
         agent = SecurityAgent(llm=LLMClient(api_key="fake"))

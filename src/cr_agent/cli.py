@@ -13,7 +13,7 @@ import click
 import structlog
 
 from cr_agent import __version__
-from cr_agent.agents import SecurityAgent
+from cr_agent.agents import LogicAgent, PerformanceAgent, SecurityAgent, StyleAgent
 from cr_agent.core import ReviewOrchestrator
 from cr_agent.llm import LLMClient
 
@@ -90,11 +90,15 @@ def review(
 
     click.echo(f"Reviewing {diff_path}...", err=True)
 
-    # Wire up the pipeline
-    llm = LLMClient()
-    agent = SecurityAgent(llm=llm)
+    # Wire up all 4 agents (each with its own LLM client)
+    agents = [
+        SecurityAgent(llm=LLMClient()),
+        LogicAgent(llm=LLMClient()),
+        PerformanceAgent(llm=LLMClient()),
+        StyleAgent(llm=LLMClient()),
+    ]
     orchestrator = ReviewOrchestrator(
-        agents=[agent],
+        agents=agents,
         confidence_threshold=threshold or 0.7,
     )
 
