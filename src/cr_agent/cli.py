@@ -83,7 +83,7 @@ def review(
     if not quiet:
         _configure_logging()
 
-    diff_text = Path(diff_path).read_text(encoding="utf-8")
+    diff_text = _read_file(diff_path)
     if not diff_text.strip():
         click.echo("Error: diff file is empty.", err=True)
         sys.exit(1)
@@ -125,6 +125,25 @@ def review(
     critical_count = sum(1 for f in report.findings if f.severity == "critical")
     if critical_count:
         click.echo(f"WARNING: {critical_count} critical issues found!", err=True)
+
+
+def _read_file(path: str) -> str:
+    """Read a file, trying common encodings (handles PowerShell UTF-16 output)."""
+    raw = Path(path).read_bytes()
+    # UTF-16 BOM (PowerShell default on Windows)
+    if raw[:2] == b"\xff\xfe":
+        return raw.decode("utf-16-le")
+    if raw[:2] == b"\xfe\xff":
+        return raw.decode("utf-16-be")
+    # UTF-8 with BOM
+    if raw[:3] == b"\xef\xbb\xbf":
+        return raw.decode("utf-8-sig")
+    # Try UTF-8, fall back to system locale
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        import locale
+        return raw.decode(locale.getpreferredencoding())
 
 
 def _configure_logging():

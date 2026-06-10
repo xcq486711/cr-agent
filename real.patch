@@ -1,0 +1,655 @@
+diff --git a/src/main/java/com/elderlycare/backend/config/WebConfig.java b/src/main/java/com/elderlycare/backend/config/WebConfig.java
+index 560cbb9..81e781c 100644
+--- a/src/main/java/com/elderlycare/backend/config/WebConfig.java
++++ b/src/main/java/com/elderlycare/backend/config/WebConfig.java
+@@ -32,6 +32,7 @@ public class WebConfig implements WebMvcConfigurer {
+                 .addPathPatterns("/**")
+                 .excludePathPatterns(
+                         "/auth/login",
++                        "/radar/callback/**",
+                         "/swagger-ui.html",
+                         "/swagger-ui/**",
+                         "/v3/api-docs/**",
+diff --git a/src/main/java/com/elderlycare/backend/service/impl/AlertEventServiceImpl.java b/src/main/java/com/elderlycare/backend/service/impl/AlertEventServiceImpl.java
+index f39f5c0..006125a 100644
+--- a/src/main/java/com/elderlycare/backend/service/impl/AlertEventServiceImpl.java
++++ b/src/main/java/com/elderlycare/backend/service/impl/AlertEventServiceImpl.java
+@@ -234,8 +234,8 @@ public class AlertEventServiceImpl extends ServiceImpl<AlertEventMapper, AlertEv
+     }
+ 
+     private void buildMeasuredAndDescription(AlertEvent event, Resident resident, AlertRule rule) {
+-        // 尝试从老人的床位获取房间号
+-        String roomNo = "未知";
++        // 用老人 bed_id 作为房间标识
++        String roomNo = resident.getBedId() != null ? resident.getBedId() + "号床" : "未知";
+         event.setRoomNo(roomNo);
+ 
+         BigDecimal val1 = rule.getParam1Value();
+@@ -246,7 +246,7 @@ public class AlertEventServiceImpl extends ServiceImpl<AlertEventMapper, AlertEv
+                 int diastolic = RANDOM.nextInt(15) + 90;
+                 event.setMeasuredValue(systolic + "/" + diastolic);
+                 event.setMeasuredUnit("mmHg");
+-                event.setDescription(roomNo + "房 " + resident.getName()
++                event.setDescription(roomNo + " " + resident.getName()
+                         + " 收缩压 " + systolic + "/" + diastolic + " mmHg，超出正常范围。");
+                 break;
+             }
+@@ -254,7 +254,7 @@ public class AlertEventServiceImpl extends ServiceImpl<AlertEventMapper, AlertEv
+                 double sugar = 7.0 + RANDOM.nextDouble() * 5.0;
+                 event.setMeasuredValue(String.format("%.1f", sugar));
+                 event.setMeasuredUnit("mmol/L");
+-                event.setDescription(roomNo + "房 " + resident.getName()
++                event.setDescription(roomNo + " " + resident.getName()
+                         + " 空腹血糖 " + String.format("%.1f", sugar) + " mmol/L，超出正常范围。");
+                 break;
+             }
+@@ -262,7 +262,7 @@ public class AlertEventServiceImpl extends ServiceImpl<AlertEventMapper, AlertEv
+                 double temp = 37.5 + RANDOM.nextDouble() * 2.0;
+                 event.setMeasuredValue(String.format("%.1f", temp));
+                 event.setMeasuredUnit("°C");
+-                event.setDescription(roomNo + "房 " + resident.getName()
++                event.setDescription(roomNo + " " + resident.getName()
+                         + " 体温 " + String.format("%.1f", temp) + "°C，超出正常范围，建议进一步检查。");
+                 break;
+             }
+@@ -270,7 +270,7 @@ public class AlertEventServiceImpl extends ServiceImpl<AlertEventMapper, AlertEv
+                 int hr = val1 != null ? val1.intValue() + RANDOM.nextInt(20) + 5 : 105;
+                 event.setMeasuredValue(String.valueOf(hr));
+                 event.setMeasuredUnit("bpm");
+-                event.setDescription(roomNo + "房 " + resident.getName()
++                event.setDescription(roomNo + " " + resident.getName()
+                         + " 心率 " + hr + " bpm，超出正常上限，建议关注。");
+                 break;
+             }
+@@ -278,7 +278,7 @@ public class AlertEventServiceImpl extends ServiceImpl<AlertEventMapper, AlertEv
+                 double hours = 4.0 + RANDOM.nextDouble() * 2.0;
+                 event.setMeasuredValue(String.format("%.1f", hours));
+                 event.setMeasuredUnit("小时");
+-                event.setDescription(roomNo + "房 " + resident.getName()
++                event.setDescription(roomNo + " " + resident.getName()
+                         + " 昨晚睡眠仅" + String.format("%.1f", hours) + "小时，不足最低标准。");
+                 break;
+             }
+@@ -286,7 +286,7 @@ public class AlertEventServiceImpl extends ServiceImpl<AlertEventMapper, AlertEv
+                 int minutes = val1 != null ? val1.intValue() + RANDOM.nextInt(30) + 10 : 130;
+                 event.setMeasuredValue(String.valueOf(minutes));
+                 event.setMeasuredUnit("分钟");
+-                event.setDescription(roomNo + "房 " + resident.getName()
++                event.setDescription(roomNo + " " + resident.getName()
+                         + " 已连续静坐超过" + minutes + "分钟，建议起身活动。");
+                 break;
+             }
+@@ -294,7 +294,7 @@ public class AlertEventServiceImpl extends ServiceImpl<AlertEventMapper, AlertEv
+                 int delay = val1 != null ? val1.intValue() + RANDOM.nextInt(30) + 5 : 30;
+                 event.setMeasuredValue(String.valueOf(delay));
+                 event.setMeasuredUnit("分钟");
+-                event.setDescription(roomNo + "房 " + resident.getName()
++                event.setDescription(roomNo + " " + resident.getName()
+                         + " 未按时服药，已推迟" + delay + "分钟。");
+                 break;
+             }
+@@ -302,14 +302,14 @@ public class AlertEventServiceImpl extends ServiceImpl<AlertEventMapper, AlertEv
+                 int days = RANDOM.nextInt(5) + 2;
+                 event.setMeasuredValue(String.valueOf(days));
+                 event.setMeasuredUnit("天");
+-                event.setDescription(roomNo + "房 " + resident.getName()
++                event.setDescription(roomNo + " " + resident.getName()
+                         + " 常备药库存仅余" + days + "天用量，请及时补充。");
+                 break;
+             }
+             default: {
+                 event.setMeasuredValue("异常");
+                 event.setMeasuredUnit("");
+-                event.setDescription(roomNo + "房 " + resident.getName()
++                event.setDescription(roomNo + " " + resident.getName()
+                         + " " + rule.getRuleName() + "触发告警。");
+                 break;
+             }
+diff --git a/src/main/resources/application-prod.yml b/src/main/resources/application-prod.yml
+index 6cb7b68..3446f55 100644
+--- a/src/main/resources/application-prod.yml
++++ b/src/main/resources/application-prod.yml
+@@ -27,6 +27,10 @@ jwt:
+   secret: your-jwt-prod-secret-key
+   expiration: 604800000
+ 
++# 文件上传（Linux 服务器路径）
++upload:
++  path: /data/uploads/elderly-care/
++
+ # 日志级别
+ logging:
+   level:
+diff --git a/src/main/resources/application.yml b/src/main/resources/application.yml
+index 840f6fc..7ba936c 100644
+--- a/src/main/resources/application.yml
++++ b/src/main/resources/application.yml
+@@ -40,6 +40,13 @@ springdoc:
+     operations-sorter: alpha
+     tags-sorter: alpha
+ 
++# 清澜雷达 API 配置
++qinglan:
++  api:
++    base-url: https://qinglanst.com
++    appid: ql15892026060816071553f6
++    secret: aacf2a3c9857da479919f62bae1b09a80ad7c49a
++
+ # 管理端点
+ management:
+   endpoints:
+diff --git a/src/main/resources/db/alert-mock-seed.sql b/src/main/resources/db/alert-mock-seed.sql
+index 920aac9..9c74e25 100644
+--- a/src/main/resources/db/alert-mock-seed.sql
++++ b/src/main/resources/db/alert-mock-seed.sql
+@@ -1,46 +1,55 @@
+ -- ============================================
+ -- 告警事件 — 模拟种子数据
+ -- ============================================
+--- 说明：以下数据依赖 data.sql 已加载的 resident 表数据（如 王秀英、李建国、陈玉兰 等）
+--- 如果 resident 表中不存在对应老人，这些 INSERT 会因为子查询返回 NULL 而跳过
++-- 说明：基于当前 resident 表真实数据生成
+ -- 建议在执行 data.sql 之后执行本脚本
+ 
++-- 1. 马桂芳（高血压）+ 血压规则 → 紧急告警
+ INSERT INTO alert_event (resident_id, resident_name, room_no, rule_key, category, severity, title, description, measured_value, measured_unit, threshold_value, status, trigger_time)
+-SELECT r.id, r.name, '302', 'blood_pressure', 'vital', '紧急', '体征异常 - 血压过高', CONCAT('302房 ', r.name, ' 收缩压 168/95 mmHg，超出正常范围。已连续2次测量偏高。'), '168/95', 'mmHg', '收缩压上限 160mmHg，舒张压上限 100mmHg', '待处理', DATE_SUB(NOW(), INTERVAL 2 HOUR))
+-FROM resident r WHERE r.name = '王秀英' AND r.deleted = 0;
++SELECT r.id, r.name, CONCAT(r.bed_id, '号床'), 'blood_pressure', 'vital', '紧急', '体征异常 - 血压过高', CONCAT(r.bed_id, '号床 ', r.name, ' 收缩压 168/95 mmHg，超出正常范围。已连续2次测量偏高。'), '168/95', 'mmHg', '收缩压上限 160mmHg，舒张压上限 100mmHg', '待处理', DATE_SUB(NOW(), INTERVAL 2 HOUR)
++FROM resident r WHERE r.name = '马桂芳' AND r.deleted = 0;
+ 
++-- 2. 李建华 + 体温规则 → 紧急告警
+ INSERT INTO alert_event (resident_id, resident_name, room_no, rule_key, category, severity, title, description, measured_value, measured_unit, threshold_value, status, trigger_time)
+-SELECT r.id, r.name, '205', 'temperature', 'vital', '紧急', '体温异常', CONCAT('205房 ', r.name, ' 体温 37.8°C，伴有咳嗽症状，建议进一步检查。'), '37.8', '°C', '体温上限 37.5°C', '待处理', DATE_SUB(NOW(), INTERVAL 3 HOUR))
+-FROM resident r WHERE r.name = '李建国' AND r.deleted = 0;
++SELECT r.id, r.name, CONCAT(r.bed_id, '号床'), 'temperature', 'vital', '紧急', '体温异常', CONCAT(r.bed_id, '号床 ', r.name, ' 体温 37.8°C，伴有咳嗽症状，建议进一步检查。'), '37.8', '°C', '体温上限 37.5°C', '待处理', DATE_SUB(NOW(), INTERVAL 3 HOUR)
++FROM resident r WHERE r.name = '李建华' AND r.deleted = 0;
+ 
++-- 3. 陈秀珍 + 未按时服药 → 重要告警
+ INSERT INTO alert_event (resident_id, resident_name, room_no, rule_key, category, severity, title, description, measured_value, measured_unit, threshold_value, status, trigger_time)
+-SELECT r.id, r.name, '118', 'missed_medication', 'medication', '重要', '未按时服药', CONCAT('118房 ', r.name, ' 未按时服用二甲双胍，已推迟30分钟。'), '30', '分钟', '延迟提醒时间 15分钟', '待处理', DATE_SUB(NOW(), INTERVAL 4 HOUR))
+-FROM resident r WHERE r.name = '陈玉兰' AND r.deleted = 0;
++SELECT r.id, r.name, CONCAT(r.bed_id, '号床'), 'missed_medication', 'medication', '重要', '未按时服药', CONCAT(r.bed_id, '号床 ', r.name, ' 未按时服用二甲双胍，已推迟30分钟。'), '30', '分钟', '延迟提醒时间 15分钟', '待处理', DATE_SUB(NOW(), INTERVAL 4 HOUR)
++FROM resident r WHERE r.name = '陈秀珍' AND r.deleted = 0;
+ 
++-- 4. 马桂芳 + 睡眠不足 → 提醒告警
+ INSERT INTO alert_event (resident_id, resident_name, room_no, rule_key, category, severity, title, description, measured_value, measured_unit, threshold_value, status, trigger_time)
+-SELECT r.id, r.name, '302', 'sleep', 'lifestyle', '提醒', '睡眠质量偏低', CONCAT('302房 ', r.name, ' 昨晚睡眠仅5.2小时，深度睡眠占比不足15%。'), '5.2', '小时', '睡眠时长下限 5小时', '待处理', DATE_SUB(NOW(), INTERVAL 8 HOUR))
+-FROM resident r WHERE r.name = '王秀英' AND r.deleted = 0;
++SELECT r.id, r.name, CONCAT(r.bed_id, '号床'), 'sleep', 'lifestyle', '提醒', '睡眠质量偏低', CONCAT(r.bed_id, '号床 ', r.name, ' 昨晚睡眠仅5.2小时，深度睡眠占比不足15%。'), '5.2', '小时', '睡眠时长下限 5小时', '待处理', DATE_SUB(NOW(), INTERVAL 8 HOUR)
++FROM resident r WHERE r.name = '马桂芳' AND r.deleted = 0;
+ 
++-- 5. 赵美玲 + 心率异常 → 重要告警
+ INSERT INTO alert_event (resident_id, resident_name, room_no, rule_key, category, severity, title, description, measured_value, measured_unit, threshold_value, status, trigger_time)
+-SELECT r.id, r.name, '410', 'heart_rate', 'vital', '重要', '心率异常', CONCAT('410房 ', r.name, ' 心率 112 bpm，超出正常上限，建议关注。'), '112', 'bpm', '心率上限 100bpm，心率下限 50bpm', '待处理', DATE_SUB(NOW(), INTERVAL 6 HOUR))
+-FROM resident r WHERE r.name = '赵德全' AND r.deleted = 0;
++SELECT r.id, r.name, CONCAT(r.bed_id, '号床'), 'heart_rate', 'vital', '重要', '心率异常', CONCAT(r.bed_id, '号床 ', r.name, ' 心率 112 bpm，超出正常上限，建议关注。'), '112', 'bpm', '心率上限 100bpm，心率下限 50bpm', '待处理', DATE_SUB(NOW(), INTERVAL 6 HOUR)
++FROM resident r WHERE r.name = '赵美玲' AND r.deleted = 0;
+ 
++-- 6. 黄丽华 + 血糖异常 → 重要告警
+ INSERT INTO alert_event (resident_id, resident_name, room_no, rule_key, category, severity, title, description, measured_value, measured_unit, threshold_value, status, trigger_time)
+-SELECT r.id, r.name, '215', 'blood_sugar', 'vital', '重要', '血糖异常', CONCAT('215房 ', r.name, ' 空腹血糖 8.2 mmol/L，超出正常范围。'), '8.2', 'mmol/L', '空腹血糖上限 7.0mmol/L，餐后血糖上限 11.1mmol/L', '待处理', DATE_SUB(NOW(), INTERVAL 5 HOUR))
+-FROM resident r WHERE r.name = '刘桂英' AND r.deleted = 0;
++SELECT r.id, r.name, CONCAT(r.bed_id, '号床'), 'blood_sugar', 'vital', '重要', '血糖异常', CONCAT(r.bed_id, '号床 ', r.name, ' 空腹血糖 8.2 mmol/L，超出正常范围。'), '8.2', 'mmol/L', '空腹血糖上限 7.0mmol/L，餐后血糖上限 11.1mmol/L', '待处理', DATE_SUB(NOW(), INTERVAL 5 HOUR)
++FROM resident r WHERE r.name = '黄丽华' AND r.deleted = 0;
+ 
++-- 7. 周海峰 + 久坐提醒 → 提醒告警
+ INSERT INTO alert_event (resident_id, resident_name, room_no, rule_key, category, severity, title, description, measured_value, measured_unit, threshold_value, status, trigger_time)
+-SELECT r.id, r.name, '108', 'sedentary', 'lifestyle', '提醒', '久坐提醒', CONCAT('108房 ', r.name, ' 已连续静坐超过130分钟，建议起身活动。'), '130', '分钟', '静止时长上限 120分钟', '待处理', DATE_SUB(NOW(), INTERVAL 1 HOUR))
+-FROM resident r WHERE r.name = '周明德' AND r.deleted = 0;
++SELECT r.id, r.name, CONCAT(r.bed_id, '号床'), 'sedentary', 'lifestyle', '提醒', '久坐提醒', CONCAT(r.bed_id, '号床 ', r.name, ' 已连续静坐超过130分钟，建议起身活动。'), '130', '分钟', '静止时长上限 120分钟', '待处理', DATE_SUB(NOW(), INTERVAL 1 HOUR)
++FROM resident r WHERE r.name = '周海峰' AND r.deleted = 0;
+ 
++-- 8. 李建华 + 药品库存不足 → 提醒告警
+ INSERT INTO alert_event (resident_id, resident_name, room_no, rule_key, category, severity, title, description, measured_value, measured_unit, threshold_value, status, trigger_time)
+-SELECT r.id, r.name, '205', 'low_stock', 'medication', '提醒', '药品库存不足', CONCAT('205房 ', r.name, ' 常备药"硝苯地平"库存仅余5天用量，请及时补充。'), '5', '天', '库存安全线 7天', '待处理', DATE_SUB(NOW(), INTERVAL 12 HOUR))
+-FROM resident r WHERE r.name = '李建国' AND r.deleted = 0;
++SELECT r.id, r.name, CONCAT(r.bed_id, '号床'), 'low_stock', 'medication', '提醒', '药品库存不足', CONCAT(r.bed_id, '号床 ', r.name, ' 常备药"硝苯地平"库存仅余5天用量，请及时补充。'), '5', '天', '库存安全线 7天', '待处理', DATE_SUB(NOW(), INTERVAL 12 HOUR)
++FROM resident r WHERE r.name = '李建华' AND r.deleted = 0;
+ 
++-- 9. 马桂芳 + 血压偏高 → 已归档（带处理记录）
+ INSERT INTO alert_event (resident_id, resident_name, room_no, rule_key, category, severity, title, description, measured_value, measured_unit, threshold_value, status, trigger_time, handler_name, handle_time, handle_notes, handle_result)
+-SELECT r.id, r.name, '302', 'blood_pressure', 'vital', '重要', '体征异常 - 血压偏高', CONCAT('302房 ', r.name, ' 收缩压 155/88 mmHg，超出正常范围。'), '155/88', 'mmHg', '收缩压上限 160mmHg，舒张压上限 100mmHg', '已归档', DATE_SUB(NOW(), INTERVAL 2 DAY), '张医生', DATE_SUB(NOW(), INTERVAL 2 DAY), '已给老人服用降压药，血压已恢复正常。', '已解决'
+-FROM resident r WHERE r.name = '王秀英' AND r.deleted = 0;
++SELECT r.id, r.name, CONCAT(r.bed_id, '号床'), 'blood_pressure', 'vital', '重要', '体征异常 - 血压偏高', CONCAT(r.bed_id, '号床 ', r.name, ' 收缩压 155/88 mmHg，超出正常范围。'), '155/88', 'mmHg', '收缩压上限 160mmHg，舒张压上限 100mmHg', '已归档', DATE_SUB(NOW(), INTERVAL 2 DAY), '张医生', DATE_SUB(NOW(), INTERVAL 2 DAY), '已给老人服用降压药，血压已恢复正常。', '已解决'
++FROM resident r WHERE r.name = '马桂芳' AND r.deleted = 0;
+ 
++-- 10. 陈秀珍 + 未按时服药 → 已归档（带处理记录）
+ INSERT INTO alert_event (resident_id, resident_name, room_no, rule_key, category, severity, title, description, measured_value, measured_unit, threshold_value, status, trigger_time, handler_name, handle_time, handle_notes, handle_result)
+-SELECT r.id, r.name, '118', 'missed_medication', 'medication', '重要', '未按时服药', CONCAT('118房 ', r.name, ' 未按时服用阿司匹林，延迟20分钟后补服。'), '20', '分钟', '延迟提醒时间 15分钟', '已归档', DATE_SUB(NOW(), INTERVAL 3 DAY), '赵丽华', DATE_SUB(NOW(), INTERVAL 3 DAY), '提醒老人补服药物，已确认服用。', '已解决'
+-FROM resident r WHERE r.name = '陈玉兰' AND r.deleted = 0;
++SELECT r.id, r.name, CONCAT(r.bed_id, '号床'), 'missed_medication', 'medication', '重要', '未按时服药', CONCAT(r.bed_id, '号床 ', r.name, ' 未按时服用阿司匹林，延迟20分钟后补服。'), '20', '分钟', '延迟提醒时间 15分钟', '已归档', DATE_SUB(NOW(), INTERVAL 3 DAY), '赵丽华', DATE_SUB(NOW(), INTERVAL 3 DAY), '提醒老人补服药物，已确认服用。', '已解决'
++FROM resident r WHERE r.name = '陈秀珍' AND r.deleted = 0;
+diff --git a/src/main/resources/db/init.sql b/src/main/resources/db/init.sql
+index 68ec385..c6017fe 100644
+--- a/src/main/resources/db/init.sql
++++ b/src/main/resources/db/init.sql
+@@ -509,14 +509,13 @@ CREATE TABLE IF NOT EXISTS finance_transaction (
+     INDEX idx_transaction_type (transaction_type),
+     INDEX idx_resident_id (resident_id)
+ ) COMMENT '财务收支记录表';
+-
+ -- ============================================
+ -- 告警事件表
+ -- ============================================
+ CREATE TABLE IF NOT EXISTS alert_event (
+-    id              BIGINT          AUTO_INCREMENT PRIMARY KEY,
+-    resident_id     BIGINT          NOT NULL COMMENT '关联老人ID',
+-    resident_name   VARCHAR(50)     NOT NULL COMMENT '冗余：老人姓名',
++                                           id              BIGINT          AUTO_INCREMENT PRIMARY KEY,
++                                           resident_id     BIGINT          NOT NULL COMMENT '关联老人ID',
++                                           resident_name   VARCHAR(50)     NOT NULL COMMENT '冗余：老人姓名',
+     room_no         VARCHAR(20)     DEFAULT NULL COMMENT '冗余：房间号',
+     rule_key        VARCHAR(50)     NOT NULL COMMENT '触发的规则标识，对应 alert_rule.rule_key',
+     category        VARCHAR(20)     NOT NULL COMMENT '分类：vital/lifestyle/medication',
+@@ -541,4 +540,5 @@ CREATE TABLE IF NOT EXISTS alert_event (
+     INDEX idx_alert_severity (severity),
+     INDEX idx_alert_category (category),
+     INDEX idx_alert_trigger_time (trigger_time)
+-) COMMENT '告警事件表';
++    ) COMMENT '告警事件表';
++
+diff --git a/src/test/java/com/elderlycare/backend/controller/AlertEventControllerTest.java b/src/test/java/com/elderlycare/backend/controller/AlertEventControllerTest.java
+new file mode 100644
+index 0000000..d9fa99d
+--- /dev/null
++++ b/src/test/java/com/elderlycare/backend/controller/AlertEventControllerTest.java
+@@ -0,0 +1,118 @@
++package com.elderlycare.backend.controller;
++
++import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
++import com.elderlycare.backend.dto.request.AlertEventHandleRequest;
++import com.elderlycare.backend.dto.vo.AlertEventVO;
++import com.elderlycare.backend.dto.vo.AlertStatisticsVO;
++import com.elderlycare.backend.service.AlertEventService;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.http.MediaType;
++import org.springframework.test.context.ActiveProfiles;
++import org.springframework.test.context.bean.override.mockito.MockitoBean;
++import org.springframework.test.web.servlet.MockMvc;
++
++import java.util.Collections;
++
++import static org.mockito.ArgumentMatchers.*;
++import static org.mockito.Mockito.when;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
++
++@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
++@AutoConfigureMockMvc
++@ActiveProfiles("test")
++class AlertEventControllerTest {
++
++    @Autowired
++    private MockMvc mockMvc;
++
++    @MockitoBean
++    private AlertEventService alertEventService;
++
++    @Autowired
++    private ObjectMapper objectMapper;
++
++    @Test
++    @DisplayName("GET /alerts/events 返回分页数据")
++    void shouldListEvents() throws Exception {
++        Page<AlertEventVO> emptyPage = new Page<>(1, 20, 0);
++        emptyPage.setRecords(Collections.emptyList());
++        when(alertEventService.pageEvents(any(), any(), any(), any(), any(), any(), anyLong(), anyLong()))
++                .thenReturn(emptyPage);
++
++        mockMvc.perform(get("/alerts/events")
++                        .param("pageNum", "1")
++                        .param("pageSize", "20"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.code").value(200))
++                .andExpect(jsonPath("$.data.total").value(0));
++    }
++
++    @Test
++    @DisplayName("GET /alerts/statistics 返回统计数据")
++    void shouldGetStatistics() throws Exception {
++        AlertStatisticsVO stats = new AlertStatisticsVO();
++        stats.setEmergencyCount(2);
++        stats.setImportantCount(3);
++        stats.setGeneralCount(8);
++        stats.setTodayHandledCount(42);
++        when(alertEventService.getStatistics()).thenReturn(stats);
++
++        mockMvc.perform(get("/alerts/statistics"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.code").value(200))
++                .andExpect(jsonPath("$.data.emergencyCount").value(2))
++                .andExpect(jsonPath("$.data.todayHandledCount").value(42));
++    }
++
++    @Test
++    @DisplayName("POST /alerts/mock/generate 返回生成数量")
++    void shouldGenerateMockAlerts() throws Exception {
++        when(alertEventService.generateMockEvents()).thenReturn(3);
++
++        mockMvc.perform(post("/alerts/mock/generate"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.code").value(200))
++                .andExpect(jsonPath("$.data.generated").value(3));
++    }
++
++    @Test
++    @DisplayName("PUT /alerts/events/{id}/handle 处理告警")
++    void shouldHandleEvent() throws Exception {
++        AlertEventVO vo = new AlertEventVO();
++        vo.setId(1L);
++        vo.setStatus("处理中");
++        when(alertEventService.handleEvent(anyLong(), any())).thenReturn(vo);
++
++        AlertEventHandleRequest req = new AlertEventHandleRequest();
++        req.setHandlerName("张医生");
++        req.setHandleNotes("已处理");
++        req.setHandleResult("已解决");
++
++        mockMvc.perform(put("/alerts/events/1/handle")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(req)))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.code").value(200))
++                .andExpect(jsonPath("$.data.status").value("处理中"));
++    }
++
++    @Test
++    @DisplayName("PUT /alerts/events/{id}/archive 归档告警")
++    void shouldArchiveEvent() throws Exception {
++        AlertEventVO vo = new AlertEventVO();
++        vo.setId(1L);
++        vo.setStatus("已归档");
++        when(alertEventService.archiveEvent(anyLong())).thenReturn(vo);
++
++        mockMvc.perform(put("/alerts/events/1/archive"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.code").value(200))
++                .andExpect(jsonPath("$.data.status").value("已归档"));
++    }
++}
+diff --git a/src/test/java/com/elderlycare/backend/service/AlertEventServiceTest.java b/src/test/java/com/elderlycare/backend/service/AlertEventServiceTest.java
+new file mode 100644
+index 0000000..389087b
+--- /dev/null
++++ b/src/test/java/com/elderlycare/backend/service/AlertEventServiceTest.java
+@@ -0,0 +1,185 @@
++package com.elderlycare.backend.service;
++
++import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
++import com.baomidou.mybatisplus.core.metadata.IPage;
++import com.elderlycare.backend.BaseServiceTest;
++import com.elderlycare.backend.dto.request.AlertEventHandleRequest;
++import com.elderlycare.backend.dto.vo.AlertEventVO;
++import com.elderlycare.backend.dto.vo.AlertStatisticsVO;
++import com.elderlycare.backend.entity.AlertEvent;
++import com.elderlycare.backend.entity.AlertRule;
++import com.elderlycare.backend.entity.Resident;
++import com.elderlycare.backend.exception.BusinessException;
++import com.elderlycare.backend.mapper.AlertEventMapper;
++import com.elderlycare.backend.mapper.AlertRuleMapper;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.transaction.annotation.Transactional;
++
++import java.math.BigDecimal;
++import java.time.LocalDateTime;
++
++import static org.junit.jupiter.api.Assertions.*;
++
++@Transactional
++class AlertEventServiceTest extends BaseServiceTest {
++
++    @Autowired
++    private AlertEventService alertEventService;
++
++    @Autowired
++    private AlertEventMapper alertEventMapper;
++
++    @Autowired
++    private AlertRuleMapper alertRuleMapper;
++
++    private Resident resident;
++    private AlertRule rule;
++
++    @BeforeEach
++    void setUp() {
++        resident = createTestResident("测试老人");
++
++        // 确保有一条启用的规则
++        rule = alertRuleMapper.selectOne(
++                new LambdaQueryWrapper<AlertRule>()
++                        .eq(AlertRule::getEnabled, 1));
++        if (rule == null) {
++            rule = new AlertRule();
++            rule.setRuleKey("test_rule");
++            rule.setRuleName("测试规则");
++            rule.setCategory("vital");
++            rule.setEnabled(1);
++            rule.setParam1Label("上限");
++            rule.setParam1Value(new BigDecimal("100"));
++            rule.setParam1Unit("bpm");
++            rule.setSortOrder(99);
++            alertRuleMapper.insert(rule);
++        }
++    }
++
++    private AlertEvent createTestEvent(String status) {
++        AlertEvent event = new AlertEvent();
++        event.setResidentId(resident.getId());
++        event.setResidentName(resident.getName());
++        event.setRoomNo("101");
++        event.setRuleKey(rule.getRuleKey());
++        event.setCategory(rule.getCategory());
++        event.setSeverity("重要");
++        event.setTitle("测试告警");
++        event.setDescription("测试描述");
++        event.setMeasuredValue("120");
++        event.setMeasuredUnit("bpm");
++        event.setThresholdValue("上限 100bpm");
++        event.setStatus(status);
++        event.setTriggerTime(LocalDateTime.now());
++        alertEventMapper.insert(event);
++        return event;
++    }
++
++    @Test
++    @DisplayName("分页查询告警列表")
++    void shouldPageEvents() {
++        createTestEvent("待处理");
++        createTestEvent("待处理");
++
++        IPage<AlertEventVO> page = alertEventService.pageEvents("待处理", null, null, null, null, null, 1, 10);
++        assertTrue(page.getTotal() >= 2);
++    }
++
++    @Test
++    @DisplayName("查询告警详情含历史同类告警")
++    void shouldGetEventDetailWithHistory() {
++        AlertEvent e1 = createTestEvent("已归档");
++        AlertEvent e2 = createTestEvent("待处理");
++
++        AlertEventVO detail = alertEventService.getEventDetail(e2.getId());
++        assertNotNull(detail);
++        assertEquals(e2.getTitle(), detail.getTitle());
++        assertNotNull(detail.getHistoryAlerts());
++        assertTrue(detail.getHistoryAlerts().stream().anyMatch(h -> h.getId().equals(e1.getId())));
++    }
++
++    @Test
++    @DisplayName("告警统计与数据一致")
++    void shouldGetStatistics() {
++        createTestEvent("待处理");
++        createTestEvent("待处理");
++        createTestEvent("已归档");
++
++        AlertStatisticsVO stats = alertEventService.getStatistics();
++        assertTrue(stats.getImportantCount() >= 2);
++    }
++
++    @Test
++    @DisplayName("处理告警：待处理→处理中→已归档")
++    void shouldHandleEventFromPendingToArchived() {
++        AlertEvent event = createTestEvent("待处理");
++
++        // 第一次：接单 → 处理中
++        AlertEventHandleRequest req1 = new AlertEventHandleRequest();
++        req1.setHandlerName("张医生");
++        req1.setHandleNotes("已查看");
++        req1.setHandleResult(null);
++        AlertEventVO vo1 = alertEventService.handleEvent(event.getId(), req1);
++        assertEquals("处理中", vo1.getStatus());
++
++        // 第二次：提交结果 → 已归档
++        AlertEventHandleRequest req2 = new AlertEventHandleRequest();
++        req2.setHandlerName("张医生");
++        req2.setHandleNotes("已给药处理");
++        req2.setHandleResult("已解决");
++        AlertEventVO vo2 = alertEventService.handleEvent(event.getId(), req2);
++        assertEquals("已归档", vo2.getStatus());
++        assertEquals("已解决", vo2.getHandleResult());
++    }
++
++    @Test
++    @DisplayName("归档告警：待处理→已归档")
++    void shouldArchiveEvent() {
++        AlertEvent event = createTestEvent("待处理");
++
++        AlertEventVO vo = alertEventService.archiveEvent(event.getId());
++        assertEquals("已归档", vo.getStatus());
++    }
++
++    @Test
++    @DisplayName("已归档告警不可重复处理")
++    void shouldRejectHandleArchivedEvent() {
++        AlertEvent event = createTestEvent("已归档");
++
++        AlertEventHandleRequest req = new AlertEventHandleRequest();
++        req.setHandleNotes("尝试处理");
++        req.setHandleResult("已解决");
++
++        assertThrows(BusinessException.class,
++                () -> alertEventService.handleEvent(event.getId(), req));
++    }
++
++    @Test
++    @DisplayName("已归档告警不可重复归档")
++    void shouldRejectArchiveArchivedEvent() {
++        AlertEvent event = createTestEvent("已归档");
++
++        assertThrows(BusinessException.class,
++                () -> alertEventService.archiveEvent(event.getId()));
++    }
++
++    @Test
++    @DisplayName("模拟生成告警：生成数据关联真实老人和规则")
++    void shouldGenerateMockEvents() {
++        int count = alertEventService.generateMockEvents();
++        assertTrue(count > 0, "应至少生成 1 条告警");
++
++        AlertEvent latest = alertEventMapper.selectList(null)
++                .stream()
++                .reduce((a, b) -> b)
++                .orElse(null);
++        assertNotNull(latest);
++        assertNotNull(latest.getResidentId());
++        assertNotNull(latest.getRuleKey());
++        assertEquals("待处理", latest.getStatus());
++    }
++}
+diff --git a/src/test/resources/application-test.yml b/src/test/resources/application-test.yml
+index 374c94c..cd30ca0 100644
+--- a/src/test/resources/application-test.yml
++++ b/src/test/resources/application-test.yml
+@@ -22,6 +22,9 @@ server:
+   servlet:
+     context-path: /api
+ 
++upload:
++  path: /tmp/uploads/
++
+ jwt:
+   secret: test-jwt-secret-key-for-unit-tests
+   expiration: 604800000
+diff --git a/src/test/resources/db/test-schema.sql b/src/test/resources/db/test-schema.sql
+index f530529..129227c 100644
+--- a/src/test/resources/db/test-schema.sql
++++ b/src/test/resources/db/test-schema.sql
+@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS resident (
+     medical_history VARCHAR(1000)   DEFAULT NULL,
+     allergies       VARCHAR(500)    DEFAULT NULL,
+     medications     VARCHAR(1000)   DEFAULT NULL,
++    special_diet    VARCHAR(200)    DEFAULT NULL,
++    health_status   VARCHAR(10)     DEFAULT '正常',
++    tongue_status   VARCHAR(10)     DEFAULT NULL,
++    last_tongue_date DATE           DEFAULT NULL,
+     avatar_url      VARCHAR(255)    DEFAULT NULL,
+     create_time     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     update_time     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+@@ -304,3 +308,59 @@ CREATE TABLE IF NOT EXISTS care_record (
+     create_time     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     update_time     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
+ );
++
++CREATE TABLE IF NOT EXISTS alert_rule (
++    id              BIGINT          AUTO_INCREMENT PRIMARY KEY,
++    rule_key        VARCHAR(50)     NOT NULL,
++    rule_name       VARCHAR(100)    NOT NULL,
++    category        VARCHAR(20)     NOT NULL,
++    enabled         INT             NOT NULL DEFAULT 1,
++    param1_label    VARCHAR(50)     DEFAULT NULL,
++    param1_value    DECIMAL(10,2)   DEFAULT NULL,
++    param1_unit     VARCHAR(20)     DEFAULT NULL,
++    param2_label    VARCHAR(50)     DEFAULT NULL,
++    param2_value    DECIMAL(10,2)   DEFAULT NULL,
++    param2_unit     VARCHAR(20)     DEFAULT NULL,
++    sort_order      INT             NOT NULL DEFAULT 0,
++    create_time     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    update_time     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
++);
++
++CREATE TABLE IF NOT EXISTS alert_setting (
++    id                              BIGINT          PRIMARY KEY,
++    emergency_popup                 INT             NOT NULL DEFAULT 1,
++    emergency_app                   INT             NOT NULL DEFAULT 1,
++    emergency_sms                   INT             NOT NULL DEFAULT 1,
++    emergency_call                  INT             NOT NULL DEFAULT 0,
++    important_popup                 INT             NOT NULL DEFAULT 1,
++    important_app                   INT             NOT NULL DEFAULT 1,
++    important_sms                   INT             NOT NULL DEFAULT 0,
++    escalation_timeout_minutes      INT             NOT NULL DEFAULT 10,
++    escalation_consecutive_count    INT             NOT NULL DEFAULT 3,
++    update_time                     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
++);
++
++CREATE TABLE IF NOT EXISTS alert_event (
++    id              BIGINT          AUTO_INCREMENT PRIMARY KEY,
++    resident_id     BIGINT          NOT NULL,
++    resident_name   VARCHAR(50)     NOT NULL,
++    room_no         VARCHAR(20)     DEFAULT NULL,
++    rule_key        VARCHAR(50)     NOT NULL,
++    category        VARCHAR(20)     NOT NULL,
++    severity        VARCHAR(10)     NOT NULL,
++    title           VARCHAR(200)    NOT NULL,
++    description     VARCHAR(1000)   DEFAULT NULL,
++    measured_value  VARCHAR(100)    DEFAULT NULL,
++    measured_unit   VARCHAR(20)     DEFAULT NULL,
++    threshold_value VARCHAR(100)    DEFAULT NULL,
++    status          VARCHAR(10)     NOT NULL DEFAULT '待处理',
++    handler_id      BIGINT          DEFAULT NULL,
++    handler_name    VARCHAR(50)     DEFAULT NULL,
++    handle_time     TIMESTAMP       DEFAULT NULL,
++    handle_notes    VARCHAR(500)    DEFAULT NULL,
++    handle_result   VARCHAR(20)     DEFAULT NULL,
++    trigger_time    TIMESTAMP       NOT NULL,
++    create_time     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    update_time     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    deleted         TINYINT         NOT NULL DEFAULT 0
++);
